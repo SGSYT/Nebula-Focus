@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>NebulaFocus - Cosmic Pomodoro</title>
+    <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: radial-gradient(ellipse at bottom, #11131a 0%, #050608 100%);
+      color: #f4f4f5;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px 16px;
+      max-width: 420px;
+      margin: 0 auto;
+      user-select: none;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+    #starCanvas { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; opacity: 0.75; }
+    .hidden { display: none !important; }
+    #distractionBanner {
+      position: fixed; top: 14px; left: 50%; transform: translateX(-50%);
+      width: 90%; max-width: 390px; border-radius: 16px;
+      background: rgba(24, 24, 27, 0.85); backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #fca5a5; text-align: center; padding: 12px 16px; font-size: 13px; font-weight: 600; z-index: 50;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
+    }
+    header {
+      width: 100%; display: flex; justify-content: space-between; align-items: center;
+      padding: 4px 2px 18px;
+    }
+    header h1 {
+      font-size: 19px; font-weight: 600; letter-spacing: -0.02em;
+      color: #ffffff;
+    }
+    header span:last-child {
+      font-size: 11px; font-weight: 500; padding: 4px 10px; border-radius: 99px;
+      background: rgba(255, 255, 255, 0.05); color: #a1a1aa;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    main { width: 100%; display: flex; flex-direction: column; gap: 12px; }
+    .glass-card {
+      background: rgba(255, 255, 255, 0.035);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid rgba(255, 255, 255, 0.09);
+      border-top: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 24px;
+      padding: 20px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
+    }
+    /* Timer Card */
+    .glass-card > div:first-child {
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 12px; color: #71717a; font-weight: 500;
+    }
+    #phaseBadge {
+      padding: 4px 10px; border-radius: 99px; font-weight: 500; font-size: 11px;
+      background: rgba(255, 255, 255, 0.06); color: #e4e4e7;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    #timerDisplay {
+      font-size: 68px; font-weight: 300; text-align: center;
+      font-variant-numeric: tabular-nums; letter-spacing: -0.04em;
+      margin: 16px 0; color: #ffffff;
+    }
+    .glass-card > div:nth-child(3) { display: flex; gap: 10px; margin-top: 8px; }
+    button {
+      border: none; font-weight: 500; cursor: pointer; border-radius: 14px;
+      transition: transform 0.12s ease, background 0.2s ease, opacity 0.2s;
+    }
+    button:active { transform: scale(0.96); }
+    #startPauseBtn {
+      flex: 1; padding: 14px; font-size: 14px; font-weight: 600;
+      background: #ffffff; color: #09090b;
+      box-shadow: 0 4px 20px rgba(255, 255, 255, 0.15);
+    }
+    button[onclick="resetTimer()"] {
+      padding: 14px 18px; font-size: 14px;
+      background: rgba(255, 255, 255, 0.05); color: #a1a1aa;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .glass-card > div:nth-child(4) {
+      margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(255, 255, 255, 0.07);
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 12px; color: #a1a1aa;
+    }
+    input[type="checkbox"] { accent-color: #ffffff; width: 15px; height: 15px; }
+    h2 {
+      font-size: 11px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.08em; color: #71717a; margin-bottom: 14px;
+    }
+    /* Minimalist Glass Rotary Knobs */
+    .grid-cols-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; }
+    .knob-dial {
+      width: 76px; height: 76px; border-radius: 50%; margin: 0 auto; position: relative;
+      display: flex; align-items: center; justify-content: center; touch-action: none; cursor: grab;
+      background: linear-gradient(145deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.01));
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.2);
+    }
+    .knob-dial > div:first-child { position: absolute; inset: 0; border-radius: 50%; }
+    .knob-dial > div:first-child span {
+      width: 6px; height: 6px; border-radius: 50%; background: #ffffff;
+      box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+      position: absolute; top: 7px; left: 50%; transform: translateX(-50%);
+    }
+    #knob-rest > div:first-child span { background: #a7f3d0; box-shadow: 0 0 8px rgba(167, 243, 208, 0.6); }
+    #knob-cycles > div:first-child span { background: #cbd5e1; }
+    .knob-dial > div:last-child { z-index: 2; pointer-events: none; }
+    .knob-dial > div:last-child span:first-child { font-size: 18px; font-weight: 500; color: #ffffff; display: block; line-height: 1; }
+    .knob-dial > div:last-child span:last-child { font-size: 9px; color: #71717a; text-transform: uppercase; letter-spacing: 0.05em; }
+    .flex.items-center.gap-2.mt-2 {
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      margin-top: 10px; font-size: 11px; color: #a1a1aa;
+    }
+    .flex.items-center.gap-2.mt-2 button {
+      width: 22px; height: 22px; border-radius: 7px;
+      background: rgba(255, 255, 255, 0.05); color: #d4d4d8;
+      border: 1px solid rgba(255, 255, 255, 0.08); font-size: 12px;
+    }
+    /* Minimalist Pill Sound Buttons */
+    .grid-cols-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+    .sound-btn {
+      padding: 9px 4px; font-size: 11px; border-radius: 11px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: #a1a1aa;
+    }
+    .sound-btn.bg-purple-600 {
+      background: #ffffff; color: #09090b; font-weight: 600;
+      border-color: #ffffff; box-shadow: 0 2px 12px rgba(255, 255, 255, 0.2);
+    }
+    /* Task Splitter */
+    .flex.gap-2.mb-3 { display: flex; gap: 8px; margin-bottom: 10px; }
+    #goalInput {
+      flex: 1; background: rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px; padding: 11px 13px; color: #ffffff; font-size: 13px; outline: none;
+    }
+    #goalInput::placeholder { color: #52525b; }
+    #goalInput:focus { border-color: rgba(255, 255, 255, 0.3); }
+    button[onclick="generateSubtasks()"] {
+      padding: 11px 16px; background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.15); color: #ffffff; font-size: 13px;
+    }
+    #taskList { list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+    #taskList li {
+      display: flex; justify-content: space-between; align-items: center;
+      background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.07);
+      padding: 10px 12px; border-radius: 12px; color: #e4e4e7;
+    }
+    #taskList label { display: flex; align-items: center; gap: 10px; cursor: pointer; flex: 1; }
+    .line-through { text-decoration: line-through; opacity: 0.4; }
+  </style>
+</head>
+
+<body class="min-h-screen flex flex-col items-center justify-between p-4 max-w-md mx-auto select-none relative">
+
+  <!-- Animated Starfield Background -->
+  <canvas id="starCanvas"></canvas>
+
+  <!-- Distraction Alert Banner -->
+  <div id="distractionBanner" class="hidden fixed top-0 left-0 right-0 bg-rose-600/95 backdrop-blur-md text-white text-center py-3 px-4 font-bold z-50 shadow-lg animate-pulse">
+    ⚠️ Orbit Alert! Stay inside the app during your focus mission!
+  </div>
+
+  <!-- Clean Native App Header -->
+  <header class="w-full flex justify-between items-center pt-2 pb-3">
+    <div class="flex items-center gap-2.5">
+      <span class="w-3 h-3 rounded-full bg-purple-400 shadow-[0_0_12px_#c084fc] animate-pulse"></span>
+      <h1 class="text-xl font-extrabold tracking-wide bg-gradient-to-r from-indigo-300 via-purple-300 to-pink-300 bg-clip-text text-transparent">
+        NebulaFocus
+      </h1>
+    </div>
+    <span class="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-purple-500/15 text-purple-300 border border-purple-500/30">
+      ✦ Deep Space Mode
+    </span>
+  </header>
+
+  <!-- Main Mission Container -->
+  <main class="w-full flex-1 flex flex-col gap-4">
+    
+    <!-- Cosmic Timer Card -->
+    <div class="glass-card rounded-3xl p-6 text-center shadow-[0_0_40px_rgba(139,92,246,0.15)] relative overflow-hidden">
+      <div class="flex justify-between items-center mb-2">
+        <span id="phaseBadge" class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-purple-500/20 text-purple-300 border border-purple-500/30">
+          🚀 Focus Mission
+        </span>
+        <span id="cycleBadge" class="text-xs font-semibold text-slate-300">
+          Cycle 1 of 3
+        </span>
+      </div>
+
+      <div id="timerDisplay" class="text-7xl font-black tracking-tighter my-4 font-mono text-white drop-shadow-[0_0_15px_rgba(192,132,252,0.5)]">
+        28:00
+      </div>
+
+      <!-- Controls -->
+      <div class="flex justify-center gap-3 mt-4">
+        <button id="startPauseBtn" onclick="toggleTimer()" class="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 active:scale-95 text-white font-bold py-3.5 rounded-2xl transition shadow-lg shadow-purple-600/30">
+          Launch Focus
+        </button>
+        <button onclick="resetTimer()" class="px-5 bg-slate-900/90 border border-slate-700 hover:border-slate-500 active:scale-95 text-slate-300 font-semibold py-3.5 rounded-2xl transition">
+          Reset
+        </button>
+      </div>
+
+      <!-- Focus Lock Toggle -->
+      <div class="mt-4 pt-3 border-t border-purple-500/20 flex items-center justify-between text-xs text-slate-300">
+        <span>🛡️ Orbit Lock (Anti-Distraction)</span>
+        <input type="checkbox" id="focusLockToggle" checked class="w-4 h-4 accent-purple-500 rounded cursor-pointer" />
+      </div>
+    </div>
+    <!-- Rotary Knob Controls for Work, Rest & Cycles -->
+    <div class="glass-card rounded-2xl p-4">
+      <div class="flex justify-between items-center mb-3">
+        <h2 class="text-xs font-bold uppercase tracking-wider text-purple-300">🎛️ Orbit Control Dials</h2>
+        <span class="text-[10px] text-slate-400">Drag dial or tap +/-</span>
+      </div>
+
+      <div class="grid grid-cols-3 gap-2 text-center">
+        
+        <!-- Work Knob -->
+        <div class="flex flex-col items-center">
+          <div id="knob-work" data-type="work" class="knob-dial w-20 h-20 rounded-full border-2 border-purple-500/40 relative flex items-center justify-center">
+            <div id="rot-work" class="w-full h-full absolute inset-0 rounded-full transition-transform duration-75">
+              <span class="w-2 h-2 rounded-full bg-purple-400 shadow-[0_0_8px_#c084fc] absolute top-1.5 left-1/2 -translate-x-1/2"></span>
+            </div>
+            <div class="z-10 pointer-events-none">
+              <span id="val-work" class="text-lg font-black text-white block leading-none">28</span>
+              <span class="text-[9px] text-purple-300 uppercase">min</span>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 mt-2">
+            <button onclick="stepKnob('work', -1)" class="w-6 h-6 rounded-lg bg-slate-900 border border-purple-500/30 text-xs font-bold text-slate-300 active:scale-90">-</button>
+            <span class="text-[11px] font-semibold text-slate-300">Work</span>
+            <button onclick="stepKnob('work', 1)" class="w-6 h-6 rounded-lg bg-slate-900 border border-purple-500/30 text-xs font-bold text-slate-300 active:scale-90">+</button>
+          </div>
+        </div>
+
+        <!-- Rest Knob -->
+        <div class="flex flex-col items-center">
+          <div id="knob-rest" data-type="rest" class="knob-dial w-20 h-20 rounded-full border-2 border-emerald-500/40 relative flex items-center justify-center">
+            <div id="rot-rest" class="w-full h-full absolute inset-0 rounded-full transition-transform duration-75">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399] absolute top-1.5 left-1/2 -translate-x-1/2"></span>
+            </div>
+            <div class="z-10 pointer-events-none">
+              <span id="val-rest" class="text-lg font-black text-emerald-300 block leading-none">1</span>
+              <span class="text-[9px] text-emerald-400 uppercase">min</span>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 mt-2">
+            <button onclick="stepKnob('rest', -1)" class="w-6 h-6 rounded-lg bg-slate-900 border border-emerald-500/30 text-xs font-bold text-slate-300 active:scale-90">-</button>
+            <span class="text-[11px] font-semibold text-slate-300">Rest</span>
+            <button onclick="stepKnob('rest', 1)" class="w-6 h-6 rounded-lg bg-slate-900 border border-emerald-500/30 text-xs font-bold text-slate-300 active:scale-90">+</button>
+          </div>
+        </div>
+
+        <!-- Cycles Knob -->
+        <div class="flex flex-col items-center">
+          <div id="knob-cycles" data-type="cycles" class="knob-dial w-20 h-20 rounded-full border-2 border-indigo-500/40 relative flex items-center justify-center">
+            <div id="rot-cycles" class="w-full h-full absolute inset-0 rounded-full transition-transform duration-75">
+              <span class="w-2 h-2 rounded-full bg-indigo-400 shadow-[0_0_8px_#818cf8] absolute top-1.5 left-1/2 -translate-x-1/2"></span>
+            </div>
+            <div class="z-10 pointer-events-none">
+              <span id="val-cycles" class="text-lg font-black text-indigo-300 block leading-none">3</span>
+              <span class="text-[9px] text-indigo-400 uppercase">x</span>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 mt-2">
+            <button onclick="stepKnob('cycles', -1)" class="w-6 h-6 rounded-lg bg-slate-900 border border-indigo-500/30 text-xs font-bold text-slate-300 active:scale-90">-</button>
+            <span class="text-[11px] font-semibold text-slate-300">Cycles</span>
+            <button onclick="stepKnob('cycles', 1)" class="w-6 h-6 rounded-lg bg-slate-900 border border-indigo-500/30 text-xs font-bold text-slate-300 active:scale-90">+</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Ambient Soundscape Selector -->
+    <div class="glass-card rounded-2xl p-4">
+      <div class="flex justify-between items-center mb-3">
+        <h2 class="text-xs font-bold uppercase tracking-wider text-purple-300">🌌 Cosmic Audio</h2>
+        <span id="audioStatus" class="text-[11px] text-slate-400">Off</span>
+      </div>
+      <div class="grid grid-cols-5 gap-1.5">
+        <button onclick="setSound('off')" id="btn-off" class="sound-btn bg-purple-600 text-white py-2 rounded-xl text-[11px] font-semibold transition">Mute</button>
+        <button onclick="setSound('space')" id="btn-space" class="sound-btn bg-slate-950/70 border border-purple-500/20 text-slate-300 py-2 rounded-xl text-[11px] font-semibold transition">Space</button>
+        <button onclick="setSound('brown')" id="btn-brown" class="sound-btn bg-slate-950/70 border border-purple-500/20 text-slate-300 py-2 rounded-xl text-[11px] font-semibold transition">Brown</button>
+        <button onclick="setSound('pink')" id="btn-pink" class="sound-btn bg-slate-950/70 border border-purple-500/20 text-slate-300 py-2 rounded-xl text-[11px] font-semibold transition">Pink</button>
+        <button onclick="setSound('rain')" id="btn-rain" class="sound-btn bg-slate-950/70 border border-purple-500/20 text-slate-300 py-2 rounded-xl text-[11px] font-semibold transition">Rain</button>
+      </div>
+    </div>
+
+    <!-- Offline Mission Task Splitter -->
+    <div class="glass-card rounded-2xl p-4 mb-4">
+      <h2 class="text-xs font-bold uppercase tracking-wider text-purple-300 mb-2">✨ Mission Task Splitter</h2>
+      <div class="flex gap-2 mb-3">
+        <input type="text" id="goalInput" placeholder="e.g., Master Calculus Chapter 3..." class="flex-1 bg-slate-950/80 border border-purple-500/30 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-purple-400" />
+        <button onclick="generateSubtasks()" class="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 active:scale-95 px-4 py-2.5 rounded-xl text-sm font-bold transition">
+          Split
+        </button>
+      </div>
+      <ul id="taskList" class="space-y-2 text-sm"></ul>
+    </div>
+
+  </main>
+  <script>
+    // --- 1. ANIMATED STARFIELD BACKGROUND ---
+    const canvas = document.getElementById("starCanvas");
+    const ctx = canvas.getContext("2d");
+    let stars = [];
+
+    function initStars() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      stars = [];
+      const numStars = Math.floor((canvas.width * canvas.height) / 4000);
+      for (let i = 0; i < numStars; i++) {
+        stars.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height,
+          radius: Math.random() * 1.5 + 0.3,
+          alpha: Math.random(),
+          speed: (Math.random() * 0.02) + 0.005,
+          drift: (Math.random() * 0.15) + 0.02
+        });
+      }
+    }
+
+    function animateStars() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      stars.forEach(star => {
+        star.alpha += star.speed;
+        if (star.alpha >= 1 || star.alpha <= 0.1) star.speed = -star.speed;
+        star.y -= star.drift;
+        if (star.y < 0) star.y = canvas.height;
+
+        ctx.beginPath();
+        ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(226, 232, 240, ${star.alpha})`;
+        ctx.fill();
+      });
+      requestAnimationFrame(animateStars);
+    }
+
+    window.addEventListener("resize", initStars);
+    initStars();
+    animateStars();
+    // --- 2. TRUE CIRCULAR ROTARY KNOB & TIMER STATE ---
+    const knobConfig = {
+      work: { val: 28, min: 1, max: 60 },
+      rest: { val: 1, min: 1, max: 30 },
+      cycles: { val: 3, min: 1, max: 12 }
+    };
+
+    let currentCycle = 1;
+    let isWorkPhase = true;
+    let timeLeft = knobConfig.work.val * 60;
+    let isRunning = false;
+    let timerInterval = null;
+    let endTime = null;
+
+    function updateKnobVisuals(type) {
+      const cfg = knobConfig[type];
+      document.getElementById(`val-${type}`).innerText = cfg.val;
+      const pct = (cfg.val - cfg.min) / (cfg.max - cfg.min);
+      const deg = -135 + pct * 270;
+      document.getElementById(`rot-${type}`).style.transform = `rotate(${deg}deg)`;
+
+      if (!isRunning) {
+        currentCycle = 1;
+        isWorkPhase = true;
+        timeLeft = knobConfig.work.val * 60;
+        updateDisplay();
+      }
+    }
+
+    function stepKnob(type, delta) {
+      if (isRunning) return;
+      const cfg = knobConfig[type];
+      cfg.val = Math.min(cfg.max, Math.max(cfg.min, cfg.val + delta));
+      updateKnobVisuals(type);
+    }
+
+    // True Radial Angle Tracking (Follows finger/cursor around the circle)
+    document.querySelectorAll(".knob-dial").forEach(dial => {
+      const type = dial.dataset.type;
+
+      const setFromPointer = (clientX, clientY) => {
+        if (isRunning) return;
+        const rect = dial.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+
+        // Angle in degrees where 0 = top (12 o'clock), -135 = bottom-left, +135 = bottom-right
+        let angle = Math.atan2(clientY - cy, clientX - cx) * (180 / Math.PI) + 90;
+        if (angle > 180) angle -= 360;
+
+        // Clamp within the 270-degree dial arc (-135° to +135°)
+        const clamped = Math.max(-135, Math.min(135, angle));
+        const pct = (clamped + 135) / 270;
+
+        const cfg = knobConfig[type];
+        cfg.val = Math.round(cfg.min + pct * (cfg.max - cfg.min));
+        updateKnobVisuals(type);
+      };
+
+      dial.addEventListener("touchstart", e => {
+        setFromPointer(e.touches.clientX, e.touches.clientY);
+      }, { passive: true });
+
+      dial.addEventListener("touchmove", e => {
+        setFromPointer(e.touches.clientX, e.touches.clientY);
+      }, { passive: true });
+
+      dial.addEventListener("mousedown", e => {
+        e.preventDefault();
+        setFromPointer(e.clientX, e.clientY);
+        const mouseMove = ev => setFromPointer(ev.clientX, ev.clientY);
+        const mouseUp = () => {
+          window.removeEventListener("mousemove", mouseMove);
+          window.removeEventListener("mouseup", mouseUp);
+        };
+        window.addEventListener("mousemove", mouseMove);
+        window.addEventListener("mouseup", mouseUp);
+      });
+
+      dial.addEventListener("wheel", e => {
+        e.preventDefault();
+        stepKnob(type, e.deltaY < 0 ? 1 : -1);
+      }, { passive: false });
+    });
+
+       // --- 3. TIMER COUNTDOWN & CYCLE LOGIC ---
+    function toggleTimer() {
+      if (isRunning) pauseTimer();
+      else startTimer();
+    }
+
+    function startTimer() {
+      if (isRunning) return;
+      isRunning = true;
+      const btn = document.getElementById("startPauseBtn");
+      btn.innerText = "Pause";
+      btn.className = "flex-1 bg-amber-600 hover:bg-amber-500 active:scale-95 text-white font-bold py-3.5 rounded-2xl transition shadow-lg shadow-amber-600/30";
+
+      endTime = Date.now() + timeLeft * 1000;
+      timerInterval = setInterval(() => {
+        const remaining = Math.round((endTime - Date.now()) / 1000);
+        if (remaining <= 0) handlePhaseComplete();
+        else { timeLeft = remaining; updateDisplay(); }
+      }, 250);
+    }
+
+    function pauseTimer() {
+      isRunning = false;
+      clearInterval(timerInterval);
+      const btn = document.getElementById("startPauseBtn");
+      btn.innerText = "Resume";
+      btn.className = "flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 active:scale-95 text-white font-bold py-3.5 rounded-2xl transition shadow-lg shadow-purple-600/30";
+    }
+
+    function resetTimer() {
+      pauseTimer();
+      currentCycle = 1;
+      isWorkPhase = true;
+      timeLeft = knobConfig.work.val * 60;
+      document.getElementById("startPauseBtn").innerText = "Launch Focus";
+      document.getElementById("distractionBanner").classList.add("hidden");
+      updateDisplay();
+    }
+
+    function handlePhaseComplete() {
+      clearInterval(timerInterval);
+      playChime();
+
+      if (isWorkPhase) {
+        isWorkPhase = false;
+        timeLeft = knobConfig.rest.val * 60;
+        endTime = Date.now() + timeLeft * 1000;
+        updateDisplay();
+        timerInterval = setInterval(() => {
+          const remaining = Math.round((endTime - Date.now()) / 1000);
+          if (remaining <= 0) handlePhaseComplete();
+          else { timeLeft = remaining; updateDisplay(); }
+        }, 250);
+      } else if (currentCycle < knobConfig.cycles.val) {
+        currentCycle++;
+        isWorkPhase = true;
+        timeLeft = knobConfig.work.val * 60;
+        endTime = Date.now() + timeLeft * 1000;
+        updateDisplay();
+        timerInterval = setInterval(() => {
+          const remaining = Math.round((endTime - Date.now()) / 1000);
+          if (remaining <= 0) handlePhaseComplete();
+          else { timeLeft = remaining; updateDisplay(); }
+        }, 250);
+      } else {
+        isRunning = false;
+        alert("🚀 Mission Accomplished! All " + knobConfig.cycles.val + " cycles completed!");
+        resetTimer();
+      }
+    }
+
+    function updateDisplay() {
+      const mins = Math.floor(timeLeft / 60).toString().padStart(2, "0");
+      const secs = (timeLeft % 60).toString().padStart(2, "0");
+      document.getElementById("timerDisplay").innerText = `${mins}:${secs}`;
+      document.getElementById("cycleBadge").innerText = `Cycle ${currentCycle} of ${knobConfig.cycles.val}`;
+
+      const badge = document.getElementById("phaseBadge");
+      if (isWorkPhase) {
+        badge.innerText = "🚀 Focus Mission";
+        badge.className = "px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-purple-500/20 text-purple-300 border border-purple-500/30";
+      } else {
+        badge.innerText = "🛸 Cosmic Rest";
+        badge.className = "px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30";
+      }
+    }
+       // --- 4. ANTI-DISTRACTION ORBIT LOCK (5 BEEPS + AUTO-HIDE BANNER) ---
+    let bannerTimeout = null;
+
+    document.addEventListener("visibilitychange", () => {
+      const lockEnabled = document.getElementById("focusLockToggle").checked;
+      const banner = document.getElementById("distractionBanner");
+
+      if (document.hidden && isRunning && isWorkPhase && lockEnabled) {
+        playFiveWarningBeeps();
+        banner.classList.remove("hidden");
+        clearTimeout(bannerTimeout);
+      } else if (!document.hidden && !banner.classList.contains("hidden")) {
+        // Auto-hide the warning banner 3 seconds after returning to the app
+        clearTimeout(bannerTimeout);
+        bannerTimeout = setTimeout(() => {
+          banner.classList.add("hidden");
+        }, 3000);
+      }
+    });
+
+    // Also allow tapping the banner to dismiss immediately
+    document.getElementById("distractionBanner").onclick = function () {
+      this.classList.add("hidden");
+    };
+
+    function playFiveWarningBeeps() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === "suspended") audioCtx.resume();
+
+      for (let i = 0; i < 5; i++) {
+        const startTime = audioCtx.currentTime + i * 0.35;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(520, startTime);
+        gain.gain.setValueAtTime(0.18, startTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.22);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(startTime);
+        osc.stop(startTime + 0.24);
+      }
+    }
+
+    // --- 5. WARM, SMOOTHED COSMIC SOUNDSCAPES ---
+    let audioCtx = null;
+    let activeNodes = [];
+
+    function stopCurrentSound() {
+      activeNodes.forEach(node => {
+        try { node.stop(); } catch (e) {}
+        try { node.disconnect(); } catch (e) {}
+      });
+      activeNodes = [];
+    }
+
+    function setSound(type) {
+      document.querySelectorAll(".sound-btn").forEach(btn => {
+        btn.classList.remove("bg-purple-600");
+      });
+      document.getElementById(`btn-${type}`).classList.add("bg-purple-600");
+      document.getElementById("audioStatus").innerText = type === "off" ? "Off" : `Playing ${type}`;
+
+      stopCurrentSound();
+      if (type === "off") return;
+
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === "suspended") audioCtx.resume();
+
+      const masterGain = audioCtx.createGain();
+      masterGain.connect(audioCtx.destination);
+
+      if (type === "space") {
+        // Warm Deep-Space Pad (audible on phone speakers, smooth lowpass)
+        masterGain.gain.value = 0.22;
+        const filter = audioCtx.createBiquadFilter();
+        filter.type = "lowpass";
+        filter.frequency.value = 280;
+        filter.connect(masterGain);
+
+        const freqs = [110, 164.81, 220]; // Warm A-minor fifth chord
+        freqs.forEach(f => {
+          const osc = audioCtx.createOscillator();
+          osc.type = "triangle";
+          osc.frequency.value = f;
+          osc.connect(filter);
+          osc.start();
+          activeNodes.push(osc);
+        });
+        activeNodes.push(filter, masterGain);
+        return;
+      }
+
+      const bufferSize = 3 * audioCtx.sampleRate;
+      const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+      const output = noiseBuffer.getChannelData(0);
+
+      if (type === "brown") {
+        // Ultra-smooth deep rumble
+        let lastOut = 0.0;
+        for (let i = 0; i < bufferSize; i++) {
+          const white = Math.random() * 2 - 1;
+          output[i] = (lastOut + 0.015 * white) / 1.015;
+          lastOut = output[i];
+          output[i] *= 2.2;
+        }
+        const filter = audioCtx.createBiquadFilter();
+        filter.type = "lowpass";
+        filter.frequency.value = 220;
+        masterGain.gain.value = 0.45;
+
+        const src = audioCtx.createBufferSource();
+        src.buffer = noiseBuffer;
+        src.loop = true;
+        src.connect(filter);
+        filter.connect(masterGain);
+        src.start();
+        activeNodes.push(src, filter, masterGain);
+
+      } else if (type === "pink") {
+        // Muffled, cozy pink noise (no sharp hiss)
+        let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+        for (let i = 0; i < bufferSize; i++) {
+          const white = Math.random() * 2 - 1;
+          b0 = 0.99886 * b0 + white * 0.0555179;
+          b1 = 0.99332 * b1 + white * 0.0750759;
+          b2 = 0.96900 * b2 + white * 0.1538520;
+          b3 = 0.86650 * b3 + white * 0.3104856;
+          b4 = 0.55000 * b4 + white * 0.5329522;
+          b5 = -0.7616 * b5 - white * 0.0168980;
+          output[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.04;
+          b6 = white * 0.115926;
+        }
+        const filter = audioCtx.createBiquadFilter();
+        filter.type = "lowpass";
+        filter.frequency.value = 420;
+        masterGain.gain.value = 0.35;
+
+        const src = audioCtx.createBufferSource();
+        src.buffer = noiseBuffer;
+        src.loop = true;
+        src.connect(filter);
+        filter.connect(masterGain);
+        src.start();
+        activeNodes.push(src, filter, masterGain);
+
+      } else if (type === "rain") {
+        // Gentle rainfall droplets (bandpass filtered, no wind roar)
+        for (let i = 0; i < bufferSize; i++) {
+          const drop = Math.random() > 0.985 ? (Math.random() * 2 - 1) * 0.6 : (Math.random() * 2 - 1) * 0.08;
+          output[i] = drop;
+        }
+        const filter = audioCtx.createBiquadFilter();
+        filter.type = "bandpass";
+        filter.frequency.value = 1100;
+        filter.Q.value = 0.7;
+        masterGain.gain.value = 0.25;
+
+        const src = audioCtx.createBufferSource();
+        src.buffer = noiseBuffer;
+        src.loop = true;
+        src.connect(filter);
+        filter.connect(masterGain);
+        src.start();
+        activeNodes.push(src, filter, masterGain);
+      }
+    }
+
+    function playChime() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(523.25, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(783.99, audioCtx.currentTime + 0.35);
+      gain.gain.setValueAtTime(0.22, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.7);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.7);
+    }
+
+    // --- 6. OFFLINE MISSION TASK SPLITTER ---
+    function generateSubtasks() {
+      const goal = document.getElementById("goalInput").value.trim();
+      if (!goal) return alert("Enter a mission or goal first!");
+
+      const steps = [
+        `🔭 Prep & Outline: ${goal}`,
+        `🚀 Deep Sprint 1: Core work on ${goal}`,
+        `⚡ Deep Sprint 2: Practice & build ${goal}`,
+        `✅ Final Review: Wrap up ${goal}`
+      ];
+
+      const savedTasks = JSON.parse(localStorage.getItem("pomodoro_tasks") || "[]");
+      steps.forEach(t => savedTasks.push({ text: t, done: false }));
+      localStorage.setItem("pomodoro_tasks", JSON.stringify(savedTasks));
+
+      document.getElementById("goalInput").value = "";
+      renderTasks();
+    }
+
+    function renderTasks() {
+      const list = document.getElementById("taskList");
+      const tasks = JSON.parse(localStorage.getItem("pomodoro_tasks") || "[]");
+      list.innerHTML = "";
+
+      tasks.forEach((task, index) => {
+        const li = document.createElement("li");
+        li.className = "flex items-center justify-between bg-slate-950/70 border border-purple-500/20 px-3 py-2.5 rounded-xl";
+        li.innerHTML = `
+          <label class="flex items-center gap-2.5 cursor-pointer flex-1">
+            <input type="checkbox" ${task.done ? "checked" : ""} onchange="toggleTask(${index})" class="w-4 h-4 accent-purple-500 rounded" />
+            <span class="${task.done ? "line-through text-slate-500" : "text-slate-200"}">${task.text}</span>
+          </label>
+          <button onclick="deleteTask(${index})" class="text-slate-500 hover:text-rose-400 text-xs ml-2">✕</button>
+        `;
+        list.appendChild(li);
+      });
+    }
+
+    function toggleTask(index) {
+      const tasks = JSON.parse(localStorage.getItem("pomodoro_tasks") || "[]");
+      tasks[index].done = !tasks[index].done;
+      localStorage.setItem("pomodoro_tasks", JSON.stringify(tasks));
+      renderTasks();
+    }
+
+    function deleteTask(index) {
+      const tasks = JSON.parse(localStorage.getItem("pomodoro_tasks") || "[]");
+      tasks.splice(index, 1);
+      localStorage.setItem("pomodoro_tasks", JSON.stringify(tasks));
+      renderTasks();
+    }
+
+    // --- 7. INITIALIZE APP ON LOAD ---
+    window.onload = () => {
+      updateKnobVisuals("work");
+      updateKnobVisuals("rest");
+      updateKnobVisuals("cycles");
+      renderTasks();
+    };
+  </script>
+</body>
+</html>
